@@ -14,6 +14,22 @@ from bionic_reading.settings import BionicSettings
 from bionic_reading.stats import TransformResult, TransformStats
 
 
+def _ensure_toc_link_uids(toc: list, next_uid: int = 0) -> int:
+    """Assign navPoint ids to ebooklib Link entries missing uid.
+
+    EPUB3 nav parsing creates ``Link`` objects without ids; ebooklib then crashes
+    while regenerating the legacy NCX on write.
+    """
+    for item in toc:
+        if isinstance(item, tuple):
+            _, children = item
+            next_uid = _ensure_toc_link_uids(children, next_uid)
+        elif isinstance(item, epub.Link) and item.uid is None:
+            item.uid = f"navPoint-{next_uid}"
+            next_uid += 1
+    return next_uid
+
+
 def _transform_document_item(item: epub.EpubItem, settings: BionicSettings, stats: TransformStats) -> None:
     content = item.get_content().decode("utf-8")
     soup = BeautifulSoup(content, "html.parser")
@@ -40,6 +56,8 @@ def transform_epub(
 
     for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
         _transform_document_item(item, config, stats)
+
+    _ensure_toc_link_uids(book.toc)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     epub.write_epub(str(output_path), book)
