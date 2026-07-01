@@ -3,6 +3,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+import typer
 from typer.testing import CliRunner
 
 from bionic_reading.preview import print_epub_preview
@@ -11,7 +12,10 @@ from bionic_reading.text_sample import extract_epub_text_sample
 
 pytest.importorskip("ebooklib")
 
-from bionic_reading.cli import app
+from bionic_reading.cli import main
+
+_cli = typer.Typer(add_completion=False)
+_cli.command()(main)
 
 
 def _write_text_epub(path: Path, paragraphs: list[str]) -> None:
@@ -65,7 +69,7 @@ class TestPreview:
             src = Path(tmp) / "book.epub"
             out = Path(tmp) / "book-bionic.epub"
             _write_text_epub(src, ["Le petit prince voyage loin."])
-            result = runner.invoke(app, ["epub", str(src), str(out), "--preview", "--preview-words", "5"])
+            result = runner.invoke(_cli, [str(src), "-o", str(out), "--preview", "--preview-words", "5"])
             assert result.exit_code == 0
             assert "Preview" in result.stdout
             assert "Original" in result.stdout

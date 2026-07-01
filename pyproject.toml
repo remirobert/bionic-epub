@@ -21,7 +21,8 @@ dev = [
 ]
 
 [project.scripts]
-bionic-reading = "bionic_reading.cli:app"
+bionic-epub = "bionic_reading.cli:run"
+bionic-reading = "bionic_reading.cli:run"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bionic_reading"]

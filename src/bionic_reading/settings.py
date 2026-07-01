@@ -7,7 +7,7 @@ from bionic_reading.markers import HtmlBoldMarker, MarkerPair
 class BionicSettings:
     """Runtime options mirroring the Bionic Reading app/API."""
 
-    fixation: int = 1
+    fixation: int = 3
     saccade: int = 10
     marker: MarkerPair = field(default_factory=HtmlBoldMarker)
 
