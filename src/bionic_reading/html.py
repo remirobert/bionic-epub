@@ -38,6 +38,8 @@ _LANGUAGE_ONLY_ATTRS = frozenset({"lang", "xml:lang"})
 # Soft hyphens and zero-width characters split convertible words for fixation.
 # Strip them from eligible text nodes during normalize (before smooth).
 # U+00AD soft hyphen, U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+FEFF BOM.
+# Note: stripping U+200D (ZWJ) is intentional for token integrity; it may
+# split emoji ZWJ sequences (e.g. family emoji) into separate code points.
 _BREAK_JUNK_CHARS = "\u00ad\u200b\u200c\u200d\ufeff"
 _BREAK_JUNK_TABLE = str.maketrans("", "", _BREAK_JUNK_CHARS)
 
@@ -68,13 +70,17 @@ def _strip_break_junk_from_text_nodes(root: Tag) -> None:
     """Remove soft hyphens and zero-width junk from eligible text nodes.
 
     Same skip rules as transform: skip containers and emphasized/heading
-    ancestors. Only NavigableString content is rewritten.
+    ancestors. Only pure ``NavigableString`` text is rewritten (not Comment
+    or CData subclasses, which ``isinstance(..., NavigableString)`` would
+    also match).
     """
     if root.name in SKIP_CONTAINER_TAGS:
         return
 
     for child in list(root.children):
-        if isinstance(child, NavigableString):
+        # Exact type check: Comment/CData subclass NavigableString; rewriting
+        # them with replace_with would demote comments to visible body text.
+        if type(child) is NavigableString:
             if _has_skipped_ancestor(child):
                 continue
             parent = child.parent
@@ -113,6 +119,10 @@ def _normalize_text_boundaries(root: Tag) -> None:
     _unwrap_language_only_spans(root)
     _strip_break_junk_from_text_nodes(root)
     root.smooth()
+
+
+# Public alias matching the design entrypoint name.
+normalize_html_tree = _normalize_text_boundaries
 
 
 def _replace_text_node(
@@ -155,7 +165,8 @@ def _walk_text_nodes(
         return
 
     for child in list(root.children):
-        if isinstance(child, NavigableString):
+        # Exact type check so Comment/CData are not treated as body text.
+        if type(child) is NavigableString:
             if _has_skipped_ancestor(child):
                 continue
             parent = child.parent

@@ -98,3 +98,48 @@ class TestHtmlTransform:
             assert "<b>planè</b>te" in result, f"failed for {junk!r}"
             assert junk not in result
             assert "<b>pla</b>n" not in result
+
+    def test_break_junk_preserved_in_skipped_containers_and_ancestors(self):
+        """Soft hyphens must remain inside code/pre/strong/headings (skip set)."""
+        soft = "\u00ad"
+        zwsp = "\u200b"
+        html = (
+            "<html><body>"
+            f"<p>Body plan{soft}ète ok.</p>"
+            f"<pre>code plan{soft}ète</pre>"
+            f"<p><code>inline{zwsp}word</code></p>"
+            f"<p><strong>bold{soft}word</strong></p>"
+            f"<h1>Head{soft}ing</h1>"
+            "</body></html>"
+        )
+        result = transform_html_document(html, BionicSettings(fixation=1))
+        # Body text is stripped and continuously bolded.
+        assert "<b>planè</b>te" in result
+        # Skip containers / ancestors keep break junk intact and untransformed.
+        assert f"<pre>code plan{soft}ète</pre>" in result
+        assert f"<code>inline{zwsp}word</code>" in result
+        assert f"<strong>bold{soft}word</strong>" in result
+        assert f"<h1>Head{soft}ing</h1>" in result
+
+    def test_lang_spans_plus_soft_hyphen_get_continuous_bold(self):
+        """Lang-only unwrap + soft-hyphen strip combine into one fixation token."""
+        soft = "\u00ad"
+        html = (
+            "<html><body><p>"
+            f'<span lang="FR">plan{soft}</span>'
+            '<span lang="FR">ète</span>'
+            "</p></body></html>"
+        )
+        result = transform_html_document(html, BionicSettings(fixation=1))
+        assert "<b>planè</b>te" in result
+        assert soft not in result
+        assert result.count("<b>pla</b>") == 0
+
+    def test_comments_with_break_junk_are_not_demoted_to_text(self):
+        """Comments containing soft hyphens must stay comments, not body text."""
+        soft = "\u00ad"
+        html = f"<html><body><p>Hello.</p><!-- plan{soft}ète --></body></html>"
+        result = transform_html_document(html, BionicSettings(fixation=1))
+        assert f"<!-- plan{soft}ète -->" in result
+        # Soft-hyphenated comment content must not leak as transformed body text.
+        assert "<b>planè</b>te" not in result
