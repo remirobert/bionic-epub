@@ -237,3 +237,35 @@ Existing EPUB round-trip tests remain green; add one small EPUB case with marker
 - Side-by-side HTML preview for tuning  
 - Larger golden corpus and optional API parity snapshots  
 - Other formats
+
+## PR Plan
+
+### PR 1: Normalize soft hyphens and zero-width characters
+
+- **Description:** Formalize the HTML normalize entrypoint. After language-only span unwrap, strip soft hyphens (U+00AD) and zero-width junk (U+200B–U+200D, U+FEFF) from eligible text nodes, then `smooth()`. Add unit tests for soft-hyphen and ZW words becoming continuous fixation tokens.
+- **Files/components affected:** src/bionic_reading/html.py, tests/test_html.py
+- **Dependencies:** None
+
+### PR 2: Minimum bold word length
+
+- **Description:** Add `min_bold_word_length` (default 2) on settings and enforce it in `transform_text` / `transform_word` so single-letter tokens are never bolded. Update French elision expectations and related tests.
+- **Files/components affected:** src/bionic_reading/settings.py, src/bionic_reading/transform.py, tests/test_transform.py, tests/test_html.py
+- **Dependencies:** PR 1
+
+### PR 3: Idempotency marker and --force
+
+- **Description:** Inject `<meta name="bionic-epub" content="1" />` into each transformed document. If any content document already has the marker, abort the whole book with stderr message and exit code 1 (no output written) unless `--force`. Wire preview the same way. Add settings `skip_if_bionic` inverted by CLI `--force`.
+- **Files/components affected:** src/bionic_reading/html.py, src/bionic_reading/epub_io.py, src/bionic_reading/settings.py, src/bionic_reading/cli.py, src/bionic_reading/preview.py, tests/test_html.py, tests/test_epub.py, tests/test_epub_io.py
+- **Dependencies:** PR 2
+
+### PR 4: Bionic bold class and CSS inject
+
+- **Description:** Default marker becomes `<b class="bionic">…</b>`. When `bold_style` is `b+css` (default), inject stylesheet rule `b.bionic { font-weight: 700; }` into each document head. Support plain `b` style for tests. Update existing HTML assertions that expect bare `<b>`.
+- **Files/components affected:** src/bionic_reading/markers.py, src/bionic_reading/settings.py, src/bionic_reading/html.py, tests/test_html.py, tests/test_transform.py
+- **Dependencies:** PR 3
+
+### PR 5: Quality fixtures and README notes
+
+- **Description:** Add `tests/fixtures/quality/` samples (Word-style éléments, soft hyphen, already-bionic meta, clean control) and tests that load them. Document quality limits in README (mid-word `<i>`/`<a>`, use original EPUB, `--force` risk).
+- **Files/components affected:** tests/fixtures/quality/, tests/test_html.py, tests/test_quality_fixtures.py, README.md
+- **Dependencies:** PR 4
