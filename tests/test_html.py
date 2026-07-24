@@ -79,3 +79,22 @@ class TestHtmlTransform:
         assert 'class="note"' in result
         assert '<span class="note">' in result
         assert "<b>footno</b>te" in result
+
+    def test_soft_hyphen_mid_word_gets_continuous_bold(self):
+        """Soft hyphens (U+00AD) must not split a word into separate fixation tokens."""
+        soft = "\u00ad"
+        html = f"<html><body><p>La plan{soft}ète.</p></body></html>"
+        result = transform_html_document(html, BionicSettings(fixation=1))
+        assert "<b>planè</b>te" in result
+        # Must not bold the halves independently around a leftover soft hyphen.
+        assert f"<b>pla</b>n{soft}" not in result
+        assert soft not in result
+
+    def test_zero_width_chars_do_not_split_fixation_tokens(self):
+        """Zero-width space/joiner/non-joiner/BOM must be stripped before fixation."""
+        for junk in ("\u200b", "\u200c", "\u200d", "\ufeff"):
+            html = f"<html><body><p>La plan{junk}ète.</p></body></html>"
+            result = transform_html_document(html, BionicSettings(fixation=1))
+            assert "<b>planè</b>te" in result, f"failed for {junk!r}"
+            assert junk not in result
+            assert "<b>pla</b>n" not in result
