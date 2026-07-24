@@ -58,6 +58,13 @@ class TestEnglishReference:
         assert transform_text_spaced("") == ""
         assert transform_text_spaced("a") == "a"
 
+    def test_single_char_never_bolded_at_higher_fixation(self):
+        """Fixation tables may return 1 for single letters; min length gates wrap."""
+        for fixation in (2, 3, 4, 5):
+            assert transform_text("a", BionicSettings(fixation=fixation)) == "a"
+            assert transform_text("à", BionicSettings(fixation=fixation)) == "à"
+            assert transform_text("i", BionicSettings(fixation=fixation)) == "i"
+
     def test_very_long_word(self):
         word = "a" * 150
         assert transform_text_spaced(word) == ("a" * 141) + " " + ("a" * 9)
@@ -88,6 +95,14 @@ class TestFrench:
         assert "l" in result
         assert "hom me" in result
 
+    def test_elision_does_not_bold_single_letter_clitic(self):
+        """French elisions: l'homme → l'<b>hom</b>me (never bold the single-letter l)."""
+        for fixation in (1, 2, 3):
+            result = transform_text("l'homme", BionicSettings(fixation=fixation))
+            assert not result.startswith("<b>l</b>")
+            assert result.startswith("l'")
+            assert "<b>hom</b>me" in result
+
     def test_ligature_oe(self):
         assert transform_text_spaced("cœur") == "cœu r"
 
@@ -114,6 +129,22 @@ class TestSettings:
             assert "saccade" in str(exc)
         else:
             raise AssertionError("expected ValueError")
+
+    def test_min_bold_word_length_default(self):
+        assert BionicSettings().min_bold_word_length == 2
+
+    def test_min_bold_word_length_out_of_range(self):
+        try:
+            BionicSettings(min_bold_word_length=0)
+        except ValueError as exc:
+            assert "min_bold_word_length" in str(exc)
+        else:
+            raise AssertionError("expected ValueError")
+
+    def test_min_bold_word_length_can_allow_single_chars(self):
+        # Explicit min of 1 restores table-driven single-letter bolding at fixation 3.
+        settings = BionicSettings(fixation=3, min_bold_word_length=1)
+        assert transform_text("a", settings) == "<b>a</b>"
 
     def test_custom_marker(self):
         settings = BionicSettings(fixation=1, marker=SpaceMarker())

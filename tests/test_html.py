@@ -13,6 +13,16 @@ class TestHtmlTransform:
         result = transform_html_document(html, BionicSettings(fixation=1))
         assert "<b>Bienven</b>ue" in result
         assert "<b>Par</b>is" in result
+        # Single-letter à is never bolded (min_bold_word_length default 2).
+        assert "<b>à</b>" not in result
+
+    def test_french_elision_does_not_bold_clitic(self):
+        html = "<html><body><p>l'homme et d'autres.</p></body></html>"
+        result = transform_html_document(html, BionicSettings(fixation=3))
+        assert "l'<b>hom</b>me" in result
+        assert "<b>l</b>" not in result
+        assert "d'<b>aut</b>res" in result or "d'" in result
+        assert "<b>d</b>" not in result
 
     def test_skips_code_blocks(self):
         html = "<html><body><p>Hello world.</p><pre>Hello world.</pre></body></html>"

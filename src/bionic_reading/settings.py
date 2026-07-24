@@ -9,6 +9,7 @@ class BionicSettings:
 
     fixation: int = 3
     saccade: int = 10
+    min_bold_word_length: int = 2
     marker: MarkerPair = field(default_factory=HtmlBoldMarker)
 
     def __post_init__(self) -> None:
@@ -16,3 +17,5 @@ class BionicSettings:
             raise ValueError("fixation must be between 1 and 5")
         if self.saccade not in range(10, 51):
             raise ValueError("saccade must be between 10 and 50")
+        if self.min_bold_word_length < 1:
+            raise ValueError("min_bold_word_length must be >= 1")
