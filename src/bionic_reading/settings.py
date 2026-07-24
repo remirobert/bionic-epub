@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from bionic_reading.markers import HtmlBoldMarker, MarkerPair, PlainHtmlBoldMarker
+from bionic_reading.markers import HtmlBoldMarker, MarkerPair, marker_for_bold_style
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,8 +25,11 @@ class BionicSettings:
             raise ValueError("saccade must be between 10 and 50")
         if self.min_bold_word_length < 1:
             raise ValueError("min_bold_word_length must be >= 1")
-        if self.bold_style not in ("b", "b+css"):
-            raise ValueError("bold_style must be 'b' or 'b+css'")
-        # Align default classed marker with plain "b" style for tests/minimal markup.
-        if self.bold_style == "b" and self.marker == HtmlBoldMarker():
-            object.__setattr__(self, "marker", PlainHtmlBoldMarker())
+        try:
+            style_marker = marker_for_bold_style(self.bold_style)
+        except ValueError as exc:
+            raise ValueError("bold_style must be 'b' or 'b+css'") from exc
+        # When the caller left the default classed marker, align it with bold_style
+        # (e.g. bold_style="b" → plain <b>). Custom markers are left alone.
+        if self.marker == HtmlBoldMarker():
+            object.__setattr__(self, "marker", style_marker)

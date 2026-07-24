@@ -96,7 +96,7 @@ class TestFrench:
         assert "hom me" in result
 
     def test_elision_does_not_bold_single_letter_clitic(self):
-        ""'French elisions: l\'homme → l\'<b class="bionic">hom</b>me (never bold the single-letter l).'""
+        """French elisions: l'homme → l'<b class="bionic">hom</b>me (never bold the single-letter l)."""
         for fixation in (1, 2, 3):
             result = transform_text("l'homme", BionicSettings(fixation=fixation))
             assert not result.startswith('<b class="bionic">l</b>')
