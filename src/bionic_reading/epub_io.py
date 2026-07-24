@@ -72,9 +72,13 @@ def document_has_bionic_marker(html: str) -> bool:
 
 
 def book_has_bionic_marker(book: epub.EpubBook) -> bool:
-    """Return True if any content document in *book* has the bionic-epub marker."""
+    """Return True if any content document in *book* has the bionic-epub marker.
+
+    Checks raw HTML (on-disk / ``item.content``) and in-memory ``item.metas`` so
+    both re-read EPUBs and books stamped only via ``add_meta`` are detected.
+    """
     for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
-        if document_has_bionic_marker(_item_raw_html(item)):
+        if _item_has_bionic_meta(item) or document_has_bionic_marker(_item_raw_html(item)):
             return True
     return False
 

@@ -196,6 +196,8 @@ class TestEpubIo:
             assert has_bionic_marker(BeautifulSoup(output, "html.parser"))
             # Only one marker even after force re-run.
             assert output.count('name="bionic-epub"') == 1
+            # Force must actually re-transform, not only re-stamp the marker.
+            assert "<b>Readi</b>ng" in output
 
     def test_round_trip_detects_marker_from_own_output(self):
         """Marker written via ebooklib add_meta is visible on re-read (nav+ncx EPUB)."""

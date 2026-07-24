@@ -118,6 +118,8 @@ class TestPreview:
             assert not again.exists()
             combined = (result.stderr or "") + (result.stdout or "")
             assert "--force" in combined
+            # Progress line must not appear before a clean refusal.
+            assert "Converting" not in (result.stdout or "")
 
     def test_cli_convert_allows_already_bionic_with_force(self):
         runner = CliRunner()
@@ -125,6 +127,13 @@ class TestPreview:
             converted = Path(tmp) / "converted.epub"
             again = Path(tmp) / "again.epub"
             _write_text_epub(converted, ["Hello world text here."], already_bionic=True)
-            result = runner.invoke(_cli, [str(converted), "-o", str(again), "--force"])
-            assert result.exit_code == 0, result.stdout + result.stderr
+            result = runner.invoke(_cli, [str(converted), "-o", str(again), "--force", "-f", "1"])
+            assert result.exit_code == 0, (result.stdout or "") + (result.stderr or "")
             assert again.exists()
+            with zipfile.ZipFile(again) as archive:
+                # ebooklib may place chapter under EPUB/
+                names = [n for n in archive.namelist() if n.endswith("chapter.xhtml")]
+                assert names
+                output = archive.read(names[0]).decode("utf-8")
+            # Force must re-transform body text, not only re-stamp the marker.
+            assert "<b>Hel</b>lo" in output

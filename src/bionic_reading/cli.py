@@ -75,12 +75,22 @@ def main(
         return
 
     destination = output or bionic_output_path(epub)
+
+    # Refuse before the progress line so abort UX is a single clear message.
+    if settings.skip_if_bionic:
+        from bionic_reading.epub_io import ALREADY_BIONIC_MESSAGE, epub_has_bionic_marker
+
+        if epub_has_bionic_marker(epub):
+            typer.secho(ALREADY_BIONIC_MESSAGE, fg=typer.colors.RED, err=True)
+            raise typer.Exit(code=1)
+
     if not quiet:
         typer.echo(f"Converting {epub.name} → {destination.name} …")
 
     try:
         result = transform_epub(epub, destination, settings)
     except AlreadyBionicError as exc:
+        # Defense in depth if the book is modified between the pre-check and transform.
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from exc
 
