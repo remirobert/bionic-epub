@@ -9,8 +9,11 @@ from bs4 import BeautifulSoup
 from ebooklib import epub
 
 from bionic_reading.html import (
+    BIONIC_CSS_ATTR,
+    BIONIC_CSS_RULE,
     BIONIC_META_CONTENT,
     BIONIC_META_NAME,
+    ensure_bionic_css,
     ensure_bionic_marker,
     has_bionic_marker,
     transform_html_tree,
@@ -112,6 +115,25 @@ def _stamp_bionic_marker(item: epub.EpubItem, soup: BeautifulSoup) -> None:
         item.add_meta(name=BIONIC_META_NAME, content=BIONIC_META_CONTENT)
 
 
+def _ensure_bionic_css_survives_write(soup: BeautifulSoup) -> None:
+    """Inject bionic CSS so it ships through ebooklib's head rebuild.
+
+    ``EpubHtml.get_content()`` rebuilds ``<head>`` from metas/links only, so a
+    ``<style>`` in the soup head is dropped on write. Mirror the same rule as
+    the first ``<body>`` child (tagged ``data-bionic-epub``) so readers still
+    get ``font-weight: 700``.
+    """
+    ensure_bionic_css(soup)
+    body = soup.body
+    if body is None:
+        return
+    if body.find("style", attrs={BIONIC_CSS_ATTR: "1"}) is not None:
+        return
+    style = soup.new_tag("style", attrs={"type": "text/css", BIONIC_CSS_ATTR: "1"})
+    style.string = BIONIC_CSS_RULE
+    body.insert(0, style)
+
+
 def _transform_document_item(item: epub.EpubItem, settings: BionicSettings, stats: TransformStats) -> None:
     content = item.get_content().decode("utf-8")
     soup = BeautifulSoup(content, "html.parser")
@@ -119,6 +141,8 @@ def _transform_document_item(item: epub.EpubItem, settings: BionicSettings, stat
     saccade_state = SaccadeState()
     transform_html_tree(root, settings, stats, saccade_state)
     _stamp_bionic_marker(item, soup)
+    if settings.bold_style == "b+css":
+        _ensure_bionic_css_survives_write(soup)
     item.set_content(str(soup).encode("utf-8"))
     stats.documents_processed += 1
 

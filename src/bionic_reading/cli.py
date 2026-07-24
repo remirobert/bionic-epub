@@ -11,12 +11,9 @@ from bionic_reading.stats import TransformResult
 
 
 def _settings(fixation: int, saccade: int, *, force: bool = False) -> BionicSettings:
-    from bionic_reading.markers import HtmlBoldMarker
-
     return BionicSettings(
         fixation=fixation,
         saccade=saccade,
-        marker=HtmlBoldMarker(),
         skip_if_bionic=not force,
     )
 
