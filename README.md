@@ -41,7 +41,7 @@ bionic-epub my-book.epub --preview
 ## Notes
 
 - DRM-protected books won't work — use an unprotected copy.
-- **Don't run it twice on the same file.** Always start from the **original** EPUB. Converted files carry a `<meta name="bionic-epub" content="1">` marker; a second run refuses by default. `--force` overrides that and **risks double-bold** (stacked `<b>` tags). There is no safe “strip previous bionic then re-apply.”
+- **Don't run it twice on the same file.** Always start from the **original** EPUB. Converted files carry a `<meta name="bionic-epub" content="1">` marker; a second run refuses by default. `--force` overrides that and **risks double-bold** (extra/adjacent `<b>` on leftover text). There is no safe “strip previous bionic then re-apply.”
 - Soft hyphens (U+00AD) and zero-width characters (ZWSP/ZWNJ/ZWJ/BOM) are stripped from body text so words stay one fixation token. Stripping ZWJ can split emoji ZWJ sequences (e.g. family emoji).
 - Mid-word italic, links, or styled spans (`<i>`, `<a>`, `class`/`style` spans) are **not** unwrapped; bold may still break inside those words.
 - Headings, code blocks, and existing bold text are left alone.

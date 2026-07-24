@@ -35,14 +35,18 @@ class TestQualityFixtures:
     def test_word_style_elements_gets_continuous_bold(self):
         """Word-style lang-only spans around *éléments* must merge into one token."""
         html = _load("word_style_elements.html")
-        # Fixture still has the fragmented markup before transform.
-        assert '<span lang="FR">é</span>' in html or "lang=" in html
+        # Require mid-word Word fragmentation in the body (not just <html lang=…>).
+        assert '<span lang="FR">é</span>' in html
+        assert '<span lang="FR">l</span>' in html
+        assert html.count('lang="FR"') >= 3
 
         result = transform_html_document(html, BionicSettings(fixation=2))
         assert '<b class="bionic">éléme</b>nts' in result
         # Must not bold each letter fragment independently.
         assert result.count('<b class="bionic">é</b>') == 0
         assert '<b class="bionic">l</b>' not in result
+        # Language-only mid-word spans are unwrapped during normalize.
+        assert '<span lang="FR">' not in result
         assert has_bionic_marker(BeautifulSoup(result, "html.parser"))
 
     def test_soft_hyphen_mid_word_gets_continuous_bold(self):
@@ -54,7 +58,8 @@ class TestQualityFixtures:
         result = transform_html_document(html, BionicSettings(fixation=1))
         assert '<b class="bionic">planè</b>te' in result
         assert soft not in result
-        assert f'<b class="bionic">pla</b>n{soft}' not in result
+        # No bold boundary splitting plan|ète after strip.
+        assert '<b class="bionic">pla</b>n' not in result
 
     def test_already_bionic_has_marker(self):
         """Minimal already-bionic fixture is detectable via the meta marker only."""
