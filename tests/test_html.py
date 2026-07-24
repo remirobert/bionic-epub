@@ -49,3 +49,33 @@ class TestHtmlTransform:
         assert "123" in result
         assert "<b>123</b>" not in result
         assert "<b>Flig</b>ht" in result
+
+    def test_word_split_across_lang_only_spans_gets_continuous_bold(self):
+        """Word exports often wrap each accented letter in its own lang span.
+
+        Without merging those fragments, fixation is applied per letter and the
+        bold range is broken inside a single word (e.g. éléments).
+        """
+        html = (
+            "<html><body><p>"
+            '<span lang="FR">plusieurs </span>'
+            '<span lang="FR">é</span>'
+            '<span lang="FR">l</span>'
+            '<span lang="FR">é</span>'
+            '<span lang="FR">ments baroques</span>'
+            "</p></body></html>"
+        )
+        result = transform_html_document(html, BionicSettings(fixation=2))
+        assert "<b>éléme</b>nts" in result
+        # Must not bold each letter fragment independently.
+        assert result.count("<b>é</b>") == 0
+        assert "<b>l</b>" not in result
+
+    def test_styled_spans_are_preserved(self):
+        html = (
+            '<html><body><p>See <span class="note">footnote</span> here.</p></body></html>'
+        )
+        result = transform_html_document(html, BionicSettings(fixation=1))
+        assert 'class="note"' in result
+        assert '<span class="note">' in result
+        assert "<b>footno</b>te" in result
