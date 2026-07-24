@@ -9,8 +9,8 @@ class BionicSettings:
 
     fixation: int = 3
     saccade: int = 10
-    min_bold_word_length: int = 2
     marker: MarkerPair = field(default_factory=HtmlBoldMarker)
+    min_bold_word_length: int = 2
 
     def __post_init__(self) -> None:
         if self.fixation not in range(1, 6):

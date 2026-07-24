@@ -21,7 +21,7 @@ class TestHtmlTransform:
         result = transform_html_document(html, BionicSettings(fixation=3))
         assert "l'<b>hom</b>me" in result
         assert "<b>l</b>" not in result
-        assert "d'<b>aut</b>res" in result or "d'" in result
+        assert "d'<b>aut</b>res" in result
         assert "<b>d</b>" not in result
 
     def test_skips_code_blocks(self):
