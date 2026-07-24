@@ -124,6 +124,44 @@ def _normalize_text_boundaries(root: Tag) -> None:
 # Public alias matching the design entrypoint name.
 normalize_html_tree = _normalize_text_boundaries
 
+# Idempotency marker written into each transformed HTML document's <head>.
+BIONIC_META_NAME = "bionic-epub"
+BIONIC_META_CONTENT = "1"
+
+
+def has_bionic_marker(soup: BeautifulSoup | Tag) -> bool:
+    """Return True if the document has the bionic-epub meta marker.
+
+    Detection uses only ``name="bionic-epub"`` and ``content="1"``.
+    """
+    return (
+        soup.find("meta", attrs={"name": BIONIC_META_NAME, "content": BIONIC_META_CONTENT})
+        is not None
+    )
+
+
+def ensure_bionic_marker(soup: BeautifulSoup) -> None:
+    """Inject ``<meta name="bionic-epub" content="1" />`` into ``<head>``.
+
+    Creates ``<head>`` when missing (under ``<html>`` if present, else at the
+    document root). No-op when the marker is already present so force re-runs
+    do not stack duplicate metas.
+    """
+    if has_bionic_marker(soup):
+        return
+
+    head = soup.head
+    if head is None:
+        head = soup.new_tag("head")
+        html_tag = soup.find("html")
+        if html_tag is not None:
+            html_tag.insert(0, head)
+        else:
+            soup.insert(0, head)
+
+    meta = soup.new_tag("meta", attrs={"name": BIONIC_META_NAME, "content": BIONIC_META_CONTENT})
+    head.append(meta)
+
 
 def _replace_text_node(
     node: NavigableString,
@@ -201,9 +239,10 @@ def transform_html_document(
     stats: TransformStats | None = None,
     saccade_state: SaccadeState | None = None,
 ) -> str:
-    """Transform an HTML/XHTML document string."""
+    """Transform an HTML/XHTML document string and stamp the bionic marker."""
     config = settings or BionicSettings()
     soup = BeautifulSoup(html, "html.parser")
     root = soup.body if soup.body is not None else soup
     transform_html_tree(root, config, stats, saccade_state)
+    ensure_bionic_marker(soup)
     return str(soup)

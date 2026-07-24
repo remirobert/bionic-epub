@@ -10,13 +10,14 @@ from bionic_reading.settings import BionicSettings
 from bionic_reading.stats import TransformResult
 
 
-def _settings(fixation: int, saccade: int) -> BionicSettings:
+def _settings(fixation: int, saccade: int, *, force: bool = False) -> BionicSettings:
     from bionic_reading.markers import HtmlBoldMarker
 
     return BionicSettings(
         fixation=fixation,
         saccade=saccade,
         marker=HtmlBoldMarker(),
+        skip_if_bionic=not force,
     )
 
 
@@ -55,14 +56,19 @@ def main(
     ),
     preview: bool = typer.Option(False, "--preview", help="Preview the first words without writing a file."),
     preview_words: int = typer.Option(200, "--preview-words", min=1, help="Words to show with --preview."),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Re-convert even if the EPUB already has a bionic-epub marker.",
+    ),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Only print the output path."),
 ) -> None:
     """Convert an EPUB to Bionic Reading format."""
-    from bionic_reading.epub_io import transform_epub
+    from bionic_reading.epub_io import AlreadyBionicError, transform_epub
     from bionic_reading.paths import bionic_output_path
     from bionic_reading.preview import print_epub_preview
 
-    settings = _settings(fixation, saccade)
+    settings = _settings(fixation, saccade, force=force)
 
     if preview:
         print_epub_preview(epub, settings, word_limit=preview_words)
@@ -72,7 +78,12 @@ def main(
     if not quiet:
         typer.echo(f"Converting {epub.name} → {destination.name} …")
 
-    result = transform_epub(epub, destination, settings)
+    try:
+        result = transform_epub(epub, destination, settings)
+    except AlreadyBionicError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+
     _print_summary(result, quiet=quiet)
 
 

@@ -11,6 +11,9 @@ class BionicSettings:
     saccade: int = 10
     marker: MarkerPair = field(default_factory=HtmlBoldMarker)
     min_bold_word_length: int = 2
+    # When True, refuse to re-convert books that already carry the bionic-epub marker.
+    # CLI --force sets this to False.
+    skip_if_bionic: bool = True
 
     def __post_init__(self) -> None:
         if self.fixation not in range(1, 6):

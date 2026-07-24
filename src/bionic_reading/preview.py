@@ -33,7 +33,18 @@ def print_epub_preview(
     *,
     word_limit: int = 200,
 ) -> None:
-    """Show original vs bionic text from the start of an EPUB."""
+    """Show original vs bionic text from the start of an EPUB.
+
+    Refuses (exit code 1) when the EPUB already has the bionic-epub marker and
+    ``settings.skip_if_bionic`` is True. Pass ``--force`` (sets
+    ``skip_if_bionic=False``) to preview anyway.
+    """
+    from bionic_reading.epub_io import ALREADY_BIONIC_MESSAGE, epub_has_bionic_marker
+
+    if settings.skip_if_bionic and epub_has_bionic_marker(input_path):
+        typer.secho(ALREADY_BIONIC_MESSAGE, fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
     sample, word_count = extract_epub_text_sample(input_path, word_limit)
     if word_count == 0:
         typer.secho("No readable text found in EPUB.", fg=typer.colors.RED, err=True)

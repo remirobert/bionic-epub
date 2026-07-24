@@ -1,5 +1,67 @@
-from bionic_reading.html import transform_html_document
+from bs4 import BeautifulSoup
+
+from bionic_reading.html import (
+    ensure_bionic_marker,
+    has_bionic_marker,
+    transform_html_document,
+)
 from bionic_reading.settings import BionicSettings
+
+
+class TestBionicMarker:
+    def test_has_bionic_marker_detects_name_and_content(self):
+        marked = (
+            '<html><head><meta name="bionic-epub" content="1"/></head>'
+            "<body><p>x</p></body></html>"
+        )
+        assert has_bionic_marker(BeautifulSoup(marked, "html.parser"))
+
+    def test_has_bionic_marker_requires_both_name_and_content(self):
+        wrong_content = (
+            '<html><head><meta name="bionic-epub" content="0"/></head>'
+            "<body><p>x</p></body></html>"
+        )
+        wrong_name = (
+            '<html><head><meta name="other" content="1"/></head>'
+            "<body><p>x</p></body></html>"
+        )
+        assert not has_bionic_marker(BeautifulSoup(wrong_content, "html.parser"))
+        assert not has_bionic_marker(BeautifulSoup(wrong_name, "html.parser"))
+
+    def test_ensure_bionic_marker_injects_into_head(self):
+        soup = BeautifulSoup(
+            "<html><head><title>T</title></head><body><p>Hi</p></body></html>",
+            "html.parser",
+        )
+        ensure_bionic_marker(soup)
+        assert has_bionic_marker(soup)
+        meta = soup.find("meta", attrs={"name": "bionic-epub", "content": "1"})
+        assert meta is not None
+        assert meta.parent.name == "head"
+
+    def test_ensure_bionic_marker_creates_head_when_missing(self):
+        soup = BeautifulSoup("<html><body><p>Hi</p></body></html>", "html.parser")
+        assert soup.head is None
+        ensure_bionic_marker(soup)
+        assert soup.head is not None
+        assert has_bionic_marker(soup)
+
+    def test_ensure_bionic_marker_is_idempotent(self):
+        soup = BeautifulSoup(
+            "<html><head></head><body><p>Hi</p></body></html>",
+            "html.parser",
+        )
+        ensure_bionic_marker(soup)
+        ensure_bionic_marker(soup)
+        assert len(soup.find_all("meta", attrs={"name": "bionic-epub"})) == 1
+
+    def test_transform_html_document_stamps_marker(self):
+        html = "<html><head><title>T</title></head><body><p>Reading is fun.</p></body></html>"
+        result = transform_html_document(html, BionicSettings(fixation=1))
+        assert has_bionic_marker(BeautifulSoup(result, "html.parser"))
+        assert 'name="bionic-epub"' in result
+        assert 'content="1"' in result
+        assert "<b>Readi</b>ng" in result
 
 
 class TestHtmlTransform:
