@@ -35,6 +35,14 @@ SKIP_ANCESTOR_TAGS = frozenset({"b", "strong", "h1", "h2", "h3", "h4", "h5", "h6
 # nodes and break continuous bionic bold if left in place.
 _LANGUAGE_ONLY_ATTRS = frozenset({"lang", "xml:lang"})
 
+# Soft hyphens and zero-width characters split convertible words for fixation.
+# Strip them from eligible text nodes during normalize (before smooth).
+# U+00AD soft hyphen, U+200B ZWSP, U+200C ZWNJ, U+200D ZWJ, U+FEFF BOM.
+# Note: stripping U+200D (ZWJ) is intentional for token integrity; it may
+# split emoji ZWJ sequences (e.g. family emoji) into separate code points.
+_BREAK_JUNK_CHARS = "\u00ad\u200b\u200c\u200d\ufeff"
+_BREAK_JUNK_TABLE = str.maketrans("", "", _BREAK_JUNK_CHARS)
+
 
 def _has_skipped_ancestor(node: NavigableString) -> bool:
     for parent in node.parents:
@@ -58,20 +66,133 @@ def _unwrap_language_only_spans(root: Tag) -> None:
             span.unwrap()
 
 
+def _strip_break_junk_from_text_nodes(root: Tag) -> None:
+    """Remove soft hyphens and zero-width junk from eligible text nodes.
+
+    Same skip rules as transform: skip containers and emphasized/heading
+    ancestors. Only pure ``NavigableString`` text is rewritten (not Comment
+    or CData subclasses, which ``isinstance(..., NavigableString)`` would
+    also match).
+    """
+    if root.name in SKIP_CONTAINER_TAGS:
+        return
+
+    for child in list(root.children):
+        # Exact type check: Comment/CData subclass NavigableString; rewriting
+        # them with replace_with would demote comments to visible body text.
+        if type(child) is NavigableString:
+            if _has_skipped_ancestor(child):
+                continue
+            parent = child.parent
+            if isinstance(parent, Tag) and parent.name in SKIP_CONTAINER_TAGS:
+                continue
+            original = str(child)
+            if not original:
+                continue
+            cleaned = original.translate(_BREAK_JUNK_TABLE)
+            if cleaned != original:
+                child.replace_with(cleaned)
+        elif isinstance(child, Tag):
+            _strip_break_junk_from_text_nodes(child)
+
+
 def _normalize_text_boundaries(root: Tag) -> None:
-    """Merge word fragments split by language-only spans into continuous text.
+    """Normalize the HTML tree so whole words are single continuous text nodes.
+
+    Ordered steps:
+
+    1. Unwrap language-only spans (``lang`` / ``xml:lang`` only) that Word and
+       similar exporters insert mid-word.
+    2. Strip soft hyphens (U+00AD) and zero-width junk (U+200B–U+200D, U+FEFF)
+       from eligible text nodes so they cannot split fixation tokens.
+    3. ``root.smooth()`` merges adjacent strings into single text nodes.
 
     Word-generated EPUBs commonly produce markup like::
 
         <span lang="FR">é</span><span lang="FR">l</span><span lang="FR">é</span>
         <span lang="FR">ments</span>
 
-    Each fragment is a separate text node, so per-node fixation bolds every
-    letter. Unwrapping those spans and smoothing adjacent strings restores
-    whole words before transformation.
+    or soft-hyphenated forms like ``plan\\u00adète``. Each fragment would
+    otherwise receive its own fixation bold. After normalize, words are
+    continuous again before transformation.
     """
     _unwrap_language_only_spans(root)
+    _strip_break_junk_from_text_nodes(root)
     root.smooth()
+
+
+# Public alias matching the design entrypoint name.
+normalize_html_tree = _normalize_text_boundaries
+
+# Idempotency marker written into each transformed HTML document's <head>.
+BIONIC_META_NAME = "bionic-epub"
+BIONIC_META_CONTENT = "1"
+
+# Stylesheet rule injected when bold_style is ``b+css``.
+BIONIC_CSS_ATTR = "data-bionic-epub"
+BIONIC_CSS_RULE = "b.bionic {\n  font-weight: 700;\n}"
+
+
+def _ensure_head(soup: BeautifulSoup) -> Tag:
+    """Return ``<head>``, creating it under ``<html>`` (or document root) if missing."""
+    head = soup.head
+    if head is not None:
+        return head
+
+    head = soup.new_tag("head")
+    html_tag = soup.find("html")
+    if html_tag is not None:
+        html_tag.insert(0, head)
+    else:
+        soup.insert(0, head)
+    return head
+
+
+def has_bionic_marker(soup: BeautifulSoup | Tag) -> bool:
+    """Return True if the document has the bionic-epub meta marker.
+
+    Detection uses only ``name="bionic-epub"`` and ``content="1"``.
+    """
+    return (
+        soup.find("meta", attrs={"name": BIONIC_META_NAME, "content": BIONIC_META_CONTENT})
+        is not None
+    )
+
+
+def ensure_bionic_marker(soup: BeautifulSoup) -> None:
+    """Inject ``<meta name="bionic-epub" content="1" />`` into ``<head>``.
+
+    Creates ``<head>`` when missing (under ``<html>`` if present, else at the
+    document root). No-op when the marker is already present so force re-runs
+    do not stack duplicate metas.
+    """
+    if has_bionic_marker(soup):
+        return
+
+    head = _ensure_head(soup)
+    meta = soup.new_tag("meta", attrs={"name": BIONIC_META_NAME, "content": BIONIC_META_CONTENT})
+    head.append(meta)
+
+
+def has_bionic_css(soup: BeautifulSoup | Tag) -> bool:
+    """Return True if the document already has our bionic stylesheet rule."""
+    return soup.find("style", attrs={BIONIC_CSS_ATTR: "1"}) is not None
+
+
+def ensure_bionic_css(soup: BeautifulSoup) -> None:
+    """Inject ``b.bionic { font-weight: 700; }`` into ``<head>``.
+
+    Creates ``<head>`` when missing. No-op when a style tagged with
+    ``data-bionic-epub="1"`` is already present so force re-runs do not stack
+    duplicate rules.
+    """
+    if has_bionic_css(soup):
+        return
+
+    head = _ensure_head(soup)
+    style = soup.new_tag("style", attrs={"type": "text/css", BIONIC_CSS_ATTR: "1"})
+    style.string = BIONIC_CSS_RULE
+    head.append(style)
 
 
 def _replace_text_node(
@@ -114,7 +235,8 @@ def _walk_text_nodes(
         return
 
     for child in list(root.children):
-        if isinstance(child, NavigableString):
+        # Exact type check so Comment/CData are not treated as body text.
+        if type(child) is NavigableString:
             if _has_skipped_ancestor(child):
                 continue
             parent = child.parent
@@ -149,9 +271,12 @@ def transform_html_document(
     stats: TransformStats | None = None,
     saccade_state: SaccadeState | None = None,
 ) -> str:
-    """Transform an HTML/XHTML document string."""
+    """Transform an HTML/XHTML document string and stamp marker + optional CSS."""
     config = settings or BionicSettings()
     soup = BeautifulSoup(html, "html.parser")
     root = soup.body if soup.body is not None else soup
     transform_html_tree(root, config, stats, saccade_state)
+    ensure_bionic_marker(soup)
+    if config.bold_style == "b+css":
+        ensure_bionic_css(soup)
     return str(soup)

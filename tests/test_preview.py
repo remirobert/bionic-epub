@@ -18,11 +18,12 @@ _cli = typer.Typer(add_completion=False)
 _cli.command()(main)
 
 
-def _write_text_epub(path: Path, paragraphs: list[str]) -> None:
+def _write_text_epub(path: Path, paragraphs: list[str], *, already_bionic: bool = False) -> None:
     body = "".join(f"<p>{text}</p>" for text in paragraphs)
+    marker = '<meta name="bionic-epub" content="1"/>' if already_bionic else ""
     chapter = f"""<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
-  <head><title>Chapter</title></head>
+  <head><title>Chapter</title>{marker}</head>
   <body>{body}</body>
 </html>"""
     container = """<?xml version="1.0" encoding="UTF-8"?>
@@ -85,3 +86,54 @@ class TestPreview:
             captured = capsys.readouterr()
             assert "Bienvenue" in captured.out
             assert "Preview stats" in captured.out
+
+    def test_preview_refuses_already_bionic_without_force(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmp:
+            converted = Path(tmp) / "converted.epub"
+            _write_text_epub(converted, ["Le petit prince voyage loin."], already_bionic=True)
+            result = runner.invoke(_cli, [str(converted), "--preview"])
+            assert result.exit_code == 1
+            combined = (result.stderr or "") + (result.stdout or "")
+            assert "--force" in combined
+            assert "original" in combined.lower()
+
+    def test_preview_allows_already_bionic_with_force(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmp:
+            converted = Path(tmp) / "converted.epub"
+            _write_text_epub(converted, ["Le petit prince voyage loin."], already_bionic=True)
+            result = runner.invoke(_cli, [str(converted), "--preview", "--force"])
+            assert result.exit_code == 0
+            assert "Preview" in result.stdout
+
+    def test_cli_convert_refuses_already_bionic_without_force(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmp:
+            converted = Path(tmp) / "converted.epub"
+            again = Path(tmp) / "again.epub"
+            _write_text_epub(converted, ["Hello world text here."], already_bionic=True)
+            result = runner.invoke(_cli, [str(converted), "-o", str(again)])
+            assert result.exit_code == 1
+            assert not again.exists()
+            combined = (result.stderr or "") + (result.stdout or "")
+            assert "--force" in combined
+            # Progress line must not appear before a clean refusal.
+            assert "Converting" not in (result.stdout or "")
+
+    def test_cli_convert_allows_already_bionic_with_force(self):
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as tmp:
+            converted = Path(tmp) / "converted.epub"
+            again = Path(tmp) / "again.epub"
+            _write_text_epub(converted, ["Hello world text here."], already_bionic=True)
+            result = runner.invoke(_cli, [str(converted), "-o", str(again), "--force", "-f", "1"])
+            assert result.exit_code == 0, (result.stdout or "") + (result.stderr or "")
+            assert again.exists()
+            with zipfile.ZipFile(again) as archive:
+                # ebooklib may place chapter under EPUB/
+                names = [n for n in archive.namelist() if n.endswith("chapter.xhtml")]
+                assert names
+                output = archive.read(names[0]).decode("utf-8")
+            # Force must re-transform body text, not only re-stamp the marker.
+            assert '<b class="bionic">Hel</b>lo' in output

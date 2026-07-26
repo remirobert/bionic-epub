@@ -28,6 +28,8 @@ def transform_word(
         saccade_skipped = True
     else:
         bold_len = fixation_length(word, settings.fixation)
+        if len(word) < settings.min_bold_word_length:
+            bold_len = 0
         if bold_len > 0 and saccade_state is not None:
             saccade_state.on_word_bolded(settings.saccade)
 
@@ -72,6 +74,8 @@ def transform_text(
             saccade_skipped = True
         else:
             bold_len = fixation_length(word, config.fixation)
+            if len(word) < config.min_bold_word_length:
+                bold_len = 0
             if bold_len > 0:
                 state.on_word_bolded(config.saccade)
 

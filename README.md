@@ -36,12 +36,16 @@ bionic-epub my-book.epub --preview
 | `-f 1–5` | Bold strength (default `3`) |
 | `-s 10–50` | How often words are bolded (default `10` = every word) |
 | `--preview` | Try it on the first 200 words, no file written |
+| `--force` | Re-convert even if the file already has a bionic-epub marker |
 
 ## Notes
 
 - DRM-protected books won't work — use an unprotected copy.
-- Don't run it twice on the same file; start from the original EPUB.
+- **Don't run it twice on the same file.** Always start from the **original** EPUB. Converted files carry a `<meta name="bionic-epub" content="1">` marker; a second run refuses by default. `--force` overrides that and **risks double-bold** (extra/adjacent `<b>` on leftover text). There is no safe “strip previous bionic then re-apply.”
+- Soft hyphens (U+00AD) and zero-width characters (ZWSP/ZWNJ/ZWJ/BOM) are stripped from body text so words stay one fixation token. Stripping ZWJ can split emoji ZWJ sequences (e.g. family emoji).
+- Mid-word italic, links, or styled spans (`<i>`, `<a>`, `class`/`style` spans) are **not** unwrapped; bold may still break inside those words.
 - Headings, code blocks, and existing bold text are left alone.
+- Hyphen-minus compounds (`well-known`) stay separate tokens around `-` (intentional).
 
 ## Development
 

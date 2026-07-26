@@ -27,7 +27,8 @@ SKIP_TAGS = frozenset(
 )
 
 _WORD = regex.compile(r"\S+", regex.UNICODE)
-_TAG = re.compile(r"</?b>")
+# Plain <b> / </b> and classed open tags like <b class="bionic">.
+_TAG = re.compile(r"</?b(?:\s[^>]*)?>")
 
 
 def take_words(text: str, limit: int) -> tuple[str, int]:

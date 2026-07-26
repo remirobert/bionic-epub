@@ -12,7 +12,9 @@ from bionic_reading.stats import TransformStats, format_count
 from bionic_reading.text_sample import extract_epub_text_sample, strip_bold_tags
 from bionic_reading.transform import transform_text
 
-_BOLD_SEGMENT = re.compile(r"(<b>.*?</b>)", re.DOTALL)
+# Match plain <b>…</b> and classed <b class="bionic">…</b>.
+_BOLD_SEGMENT = re.compile(r"(<b(?:\s[^>]*)?>.*?</b>)", re.DOTALL)
+_BOLD_INNER = re.compile(r"^<b(?:\s[^>]*)?>|</b>$")
 
 
 def _echo_bionic(html: str) -> None:
@@ -22,7 +24,8 @@ def _echo_bionic(html: str) -> None:
         if match.start() > pos:
             typer.echo(html[pos : match.start()], nl=False)
         segment = match.group(0)
-        typer.echo(typer.style(segment[3:-4], bold=True), nl=False)
+        inner = _BOLD_INNER.sub("", segment)
+        typer.echo(typer.style(inner, bold=True), nl=False)
         pos = match.end()
     typer.echo(html[pos:])
 
@@ -33,7 +36,18 @@ def print_epub_preview(
     *,
     word_limit: int = 200,
 ) -> None:
-    """Show original vs bionic text from the start of an EPUB."""
+    """Show original vs bionic text from the start of an EPUB.
+
+    Refuses (exit code 1) when the EPUB already has the bionic-epub marker and
+    ``settings.skip_if_bionic`` is True. Pass ``--force`` (sets
+    ``skip_if_bionic=False``) to preview anyway.
+    """
+    from bionic_reading.epub_io import ALREADY_BIONIC_MESSAGE, epub_has_bionic_marker
+
+    if settings.skip_if_bionic and epub_has_bionic_marker(input_path):
+        typer.secho(ALREADY_BIONIC_MESSAGE, fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
     sample, word_count = extract_epub_text_sample(input_path, word_limit)
     if word_count == 0:
         typer.secho("No readable text found in EPUB.", fg=typer.colors.RED, err=True)

@@ -1,6 +1,6 @@
 from bionic_reading import fixation_length, transform_text, transform_text_spaced
 from bionic_reading.settings import BionicSettings
-from bionic_reading.markers import HtmlBoldMarker, SpaceMarker
+from bionic_reading.markers import HtmlBoldMarker, PlainHtmlBoldMarker, SpaceMarker
 
 
 class TestFixationLength:
@@ -32,16 +32,16 @@ class TestEnglishReference:
 
     def test_paragraph_fixation_1_html(self):
         result = transform_text(self.PARAGRAPH, BionicSettings(fixation=1))
-        assert result.startswith("<b>Bion</b>ic <b>Readi</b>ng")
-        assert "<b>fixati</b>on" in result
+        assert result.startswith('<b class="bionic">Bion</b>ic <b class="bionic">Readi</b>ng')
+        assert '<b class="bionic">fixati</b>on' in result
 
     def test_paragraph_fixation_2_html(self):
         result = transform_text(self.PARAGRAPH, BionicSettings(fixation=2))
-        assert "<b>Bion</b>ic" in result
-        assert "<b>facilita</b>ting" in result
+        assert '<b class="bionic">Bion</b>ic' in result
+        assert '<b class="bionic">facilita</b>ting' in result
 
     def test_html_markers(self):
-        assert transform_text("reading", BionicSettings(fixation=1)) == "<b>readi</b>ng"
+        assert transform_text("reading", BionicSettings(fixation=1)) == '<b class="bionic">readi</b>ng'
 
     def test_pure_numbers_unchanged(self):
         assert transform_text_spaced("1234567890") == "1234567890"
@@ -57,6 +57,13 @@ class TestEnglishReference:
     def test_empty_and_single_char(self):
         assert transform_text_spaced("") == ""
         assert transform_text_spaced("a") == "a"
+
+    def test_single_char_never_bolded_at_higher_fixation(self):
+        """Fixation tables may return 1 for single letters; min length gates wrap."""
+        for fixation in (2, 3, 4, 5):
+            assert transform_text("a", BionicSettings(fixation=fixation)) == "a"
+            assert transform_text("à", BionicSettings(fixation=fixation)) == "à"
+            assert transform_text("i", BionicSettings(fixation=fixation)) == "i"
 
     def test_very_long_word(self):
         word = "a" * 150
@@ -77,7 +84,7 @@ class TestFrench:
         assert result == "Bienven ue à Par is, l a vil le lumiè re."
 
     def test_french_html_output_preserves_accents(self):
-        assert transform_text("français", BionicSettings(fixation=1)) == "<b>frança</b>is"
+        assert transform_text("français", BionicSettings(fixation=1)) == '<b class="bionic">frança</b>is'
 
     def test_cedilla_and_circumflex(self):
         assert transform_text_spaced("garçon") == "garç on"
@@ -88,6 +95,14 @@ class TestFrench:
         assert "l" in result
         assert "hom me" in result
 
+    def test_elision_does_not_bold_single_letter_clitic(self):
+        """French elisions: l'homme → l'<b class="bionic">hom</b>me (never bold the single-letter l)."""
+        for fixation in (1, 2, 3):
+            result = transform_text("l'homme", BionicSettings(fixation=fixation))
+            assert not result.startswith('<b class="bionic">l</b>')
+            assert result.startswith("l'")
+            assert '<b class="bionic">hom</b>me' in result
+
     def test_ligature_oe(self):
         assert transform_text_spaced("cœur") == "cœu r"
 
@@ -95,7 +110,7 @@ class TestFrench:
         text = "« Bonjour » dit-elle."
         result = transform_text(text, BionicSettings(fixation=1))
         assert result.startswith("«")
-        assert "<b>Bonjo</b>ur" in result
+        assert '<b class="bionic">Bonjo</b>ur' in result
 
 
 class TestSettings:
@@ -115,6 +130,39 @@ class TestSettings:
         else:
             raise AssertionError("expected ValueError")
 
+    def test_min_bold_word_length_default(self):
+        assert BionicSettings().min_bold_word_length == 2
+
+    def test_min_bold_word_length_out_of_range(self):
+        try:
+            BionicSettings(min_bold_word_length=0)
+        except ValueError as exc:
+            assert "min_bold_word_length" in str(exc)
+        else:
+            raise AssertionError("expected ValueError")
+
+    def test_min_bold_word_length_can_allow_single_chars(self):
+        # Explicit min of 1 restores table-driven single-letter bolding at fixation 3.
+        settings = BionicSettings(fixation=3, min_bold_word_length=1)
+        assert transform_text("a", settings) == '<b class="bionic">a</b>'
+
     def test_custom_marker(self):
         settings = BionicSettings(fixation=1, marker=SpaceMarker())
         assert transform_text("reading", settings) == "readi ng"
+
+    def test_bold_style_default_is_b_plus_css(self):
+        assert BionicSettings().bold_style == "b+css"
+        assert BionicSettings().marker == HtmlBoldMarker()
+
+    def test_bold_style_b_uses_plain_marker(self):
+        settings = BionicSettings(fixation=1, bold_style="b")
+        assert settings.marker == PlainHtmlBoldMarker()
+        assert transform_text("reading", settings) == "<b>readi</b>ng"
+
+    def test_bold_style_invalid(self):
+        try:
+            BionicSettings(bold_style="span")
+        except ValueError as exc:
+            assert "bold_style" in str(exc)
+        else:
+            raise AssertionError("expected ValueError")
