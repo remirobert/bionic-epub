@@ -128,10 +128,6 @@ normalize_html_tree = _normalize_text_boundaries
 BIONIC_META_NAME = "bionic-epub"
 BIONIC_META_CONTENT = "1"
 
-# Stylesheet rule injected when bold_style is ``b+css``.
-BIONIC_CSS_ATTR = "data-bionic-epub"
-BIONIC_CSS_RULE = "b.bionic {\n  font-weight: 700;\n}"
-
 
 def _ensure_head(soup: BeautifulSoup) -> Tag:
     """Return ``<head>``, creating it under ``<html>`` (or document root) if missing."""
@@ -172,27 +168,6 @@ def ensure_bionic_marker(soup: BeautifulSoup) -> None:
     head = _ensure_head(soup)
     meta = soup.new_tag("meta", attrs={"name": BIONIC_META_NAME, "content": BIONIC_META_CONTENT})
     head.append(meta)
-
-
-def has_bionic_css(soup: BeautifulSoup | Tag) -> bool:
-    """Return True if the document already has our bionic stylesheet rule."""
-    return soup.find("style", attrs={BIONIC_CSS_ATTR: "1"}) is not None
-
-
-def ensure_bionic_css(soup: BeautifulSoup) -> None:
-    """Inject ``b.bionic { font-weight: 700; }`` into ``<head>``.
-
-    Creates ``<head>`` when missing. No-op when a style tagged with
-    ``data-bionic-epub="1"`` is already present so force re-runs do not stack
-    duplicate rules.
-    """
-    if has_bionic_css(soup):
-        return
-
-    head = _ensure_head(soup)
-    style = soup.new_tag("style", attrs={"type": "text/css", BIONIC_CSS_ATTR: "1"})
-    style.string = BIONIC_CSS_RULE
-    head.append(style)
 
 
 def _replace_text_node(
@@ -271,12 +246,10 @@ def transform_html_document(
     stats: TransformStats | None = None,
     saccade_state: SaccadeState | None = None,
 ) -> str:
-    """Transform an HTML/XHTML document string and stamp marker + optional CSS."""
+    """Transform an HTML/XHTML document string and stamp the bionic-epub marker."""
     config = settings or BionicSettings()
     soup = BeautifulSoup(html, "html.parser")
     root = soup.body if soup.body is not None else soup
     transform_html_tree(root, config, stats, saccade_state)
     ensure_bionic_marker(soup)
-    if config.bold_style == "b+css":
-        ensure_bionic_css(soup)
     return str(soup)
