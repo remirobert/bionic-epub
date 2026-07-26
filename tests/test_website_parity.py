@@ -21,7 +21,7 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures" / "parity"
 # min_bold_word_length=2. Require high overall match, not 100%.
 MIN_EXACT_MATCH_RATIO = 0.95
 
-# Plain <b>…</b> prefix produced by bold_style="b".
+# Plain <b>…</b> prefix produced by the default HtmlBoldMarker.
 _PLAIN_BOLD_PREFIX = re.compile(r"^<b>(.*?)</b>", re.DOTALL)
 
 
@@ -30,8 +30,8 @@ def _tokens(text: str) -> list[str]:
 
 
 def _settings_for_scoring() -> BionicSettings:
-    """Default fixation/saccade/min-bold, plain marker for easy bold-length parse."""
-    return BionicSettings(bold_style="b")
+    """Default fixation/saccade/min-bold (plain <b> marker)."""
+    return BionicSettings()
 
 
 def _bold_len_from_transform_word(word: str, settings: BionicSettings) -> int:
@@ -160,14 +160,14 @@ class TestParityFixtures:
 
 class TestDefaultTransformSmoke:
     def test_sample_words_default_transform(self):
-        settings = BionicSettings(bold_style="b")
+        settings = BionicSettings()
         assert transform_word("Harry", settings) == "<b>Ha</b>rry"
         assert transform_word("Potter", settings) == "<b>Po</b>tter"
         assert transform_word("the", settings) == "<b>t</b>he"
         assert transform_word("a", settings) == "a"
 
     def test_preview_sentence_default(self):
-        settings = BionicSettings(bold_style="b")
+        settings = BionicSettings()
         result = transform_text("Harry Potter is a series", settings)
         assert result == (
             "<b>Ha</b>rry <b>Po</b>tter <b>i</b>s a <b>se</b>ries"
