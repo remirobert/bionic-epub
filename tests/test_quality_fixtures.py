@@ -10,7 +10,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from bionic_reading.html import has_bionic_css, has_bionic_marker, transform_html_document
+from bionic_reading.html import has_bionic_marker, transform_html_document
 from bionic_reading.settings import BionicSettings
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "quality"
@@ -41,10 +41,10 @@ class TestQualityFixtures:
         assert html.count('lang="FR"') >= 3
 
         result = transform_html_document(html, BionicSettings(fixation=2))
-        assert '<b class="bionic">éléme</b>nts' in result
+        assert '<b>éléme</b>nts' in result
         # Must not bold each letter fragment independently.
-        assert result.count('<b class="bionic">é</b>') == 0
-        assert '<b class="bionic">l</b>' not in result
+        assert result.count('<b>é</b>') == 0
+        assert '<b>l</b>' not in result
         # Language-only mid-word spans are unwrapped during normalize.
         assert '<span lang="FR">' not in result
         assert has_bionic_marker(BeautifulSoup(result, "html.parser"))
@@ -56,19 +56,18 @@ class TestQualityFixtures:
         assert soft in html  # fixture contains the soft hyphen
 
         result = transform_html_document(html, BionicSettings(fixation=1))
-        assert '<b class="bionic">planè</b>te' in result
+        assert '<b>planè</b>te' in result
         assert soft not in result
         # No bold boundary splitting plan|ète after strip.
-        assert '<b class="bionic">pla</b>n' not in result
+        assert '<b>pla</b>n' not in result
 
     def test_already_bionic_has_marker(self):
         """Minimal already-bionic fixture is detectable via the meta marker only."""
         html = _load("already_bionic.html")
         soup = BeautifulSoup(html, "html.parser")
         assert has_bionic_marker(soup)
-        assert has_bionic_css(soup)
         # Already-bolded content is present as a stable substring.
-        assert '<b class="bionic">Readi</b>ng' in html
+        assert "<b>Readi</b>ng" in html
         assert 'name="bionic-epub"' in html
         assert 'content="1"' in html
 
@@ -81,8 +80,9 @@ class TestQualityFixtures:
         assert 'name="bionic-epub"' not in html
 
         result = transform_html_document(html, BionicSettings(fixation=1))
-        assert '<b class="bionic">Readi</b>ng' in result
-        assert '<b class="bionic">i</b>s' in result
-        assert '<b class="bionic">fu</b>n' in result
+        assert "<b>Readi</b>ng" in result
+        assert "<b>i</b>s" in result
+        assert "<b>fu</b>n" in result
         assert has_bionic_marker(BeautifulSoup(result, "html.parser"))
-        assert has_bionic_css(BeautifulSoup(result, "html.parser"))
+        assert "b.bionic" not in result
+        assert "font-weight: 700" not in result

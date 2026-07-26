@@ -27,7 +27,7 @@ SKIP_TAGS = frozenset(
 )
 
 _WORD = regex.compile(r"\S+", regex.UNICODE)
-# Plain <b> / </b> and classed open tags like <b class="bionic">.
+# Plain <b> / </b> (also tolerates classed open tags from older output).
 _TAG = re.compile(r"</?b(?:\s[^>]*)?>")
 
 

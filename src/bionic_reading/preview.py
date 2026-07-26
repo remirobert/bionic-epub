@@ -12,7 +12,7 @@ from bionic_reading.stats import TransformStats, format_count
 from bionic_reading.text_sample import extract_epub_text_sample, strip_bold_tags
 from bionic_reading.transform import transform_text
 
-# Match plain <b>…</b> and classed <b class="bionic">…</b>.
+# Match plain <b>…</b> (also tolerates classed open tags from older output).
 _BOLD_SEGMENT = re.compile(r"(<b(?:\s[^>]*)?>.*?</b>)", re.DOTALL)
 _BOLD_INNER = re.compile(r"^<b(?:\s[^>]*)?>|</b>$")
 

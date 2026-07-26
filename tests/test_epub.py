@@ -129,13 +129,13 @@ class TestEpubIo:
             assert dst.exists()
             with zipfile.ZipFile(dst) as archive:
                 output = archive.read("EPUB/chapter.xhtml").decode("utf-8")
-            assert '<b class="bionic">Readi</b>ng' in output
+            assert "<b>Readi</b>ng" in output
             assert "<pre>Reading is fun.</pre>" in output
             assert has_bionic_marker(BeautifulSoup(output, "html.parser"))
-            # CSS must ship in the written chapter (body style survives ebooklib head rebuild).
-            assert "font-weight: 700" in output
-            assert "b.bionic" in output
-            assert 'data-bionic-epub="1"' in output or "data-bionic-epub" in output
+            # Plain <b> only — no class or injected CSS.
+            assert "b.bionic" not in output
+            assert "font-weight: 700" not in output
+            assert "data-bionic-epub" not in output
 
     def test_transform_epub_writes_nav_toc_with_legacy_ncx(self):
         chapter = """<?xml version="1.0" encoding="utf-8"?>
@@ -154,10 +154,10 @@ class TestEpubIo:
             assert dst.exists()
             with zipfile.ZipFile(dst) as archive:
                 output = archive.read("EPUB/chapter.xhtml").decode("utf-8")
-            assert '<b class="bionic">Readi</b>ng' in output
+            assert "<b>Readi</b>ng" in output
             assert has_bionic_marker(BeautifulSoup(output, "html.parser"))
-            assert "font-weight: 700" in output
-            assert "b.bionic" in output
+            assert "b.bionic" not in output
+            assert "font-weight: 700" not in output
 
     def test_second_run_aborts_without_force_and_writes_nothing(self):
         # Source already carries the marker (as a prior bionic-epub output would).
@@ -203,12 +203,9 @@ class TestEpubIo:
             # Only one marker even after force re-run.
             assert output.count('name="bionic-epub"') == 1
             # Force must actually re-transform, not only re-stamp the marker.
-            assert '<b class="bionic">Readi</b>ng' in output
-            # CSS ships and does not stack on force re-run.
-            assert "font-weight: 700" in output
-            assert "b.bionic" in output
-            soup = BeautifulSoup(output, "html.parser")
-            assert len(soup.find_all("style", attrs={"data-bionic-epub": "1"})) == 1
+            assert "<b>Readi</b>ng" in output
+            assert "b.bionic" not in output
+            assert "font-weight: 700" not in output
 
     def test_round_trip_detects_marker_from_own_output(self):
         """Marker written via ebooklib add_meta is visible on re-read (nav+ncx EPUB)."""

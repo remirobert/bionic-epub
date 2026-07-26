@@ -23,4 +23,6 @@ class TestTextSample:
 
     def test_strip_bold_tags(self):
         assert strip_bold_tags("<b>read</b>ing") == "reading"
+        # Older classed output still strips cleanly.
         assert strip_bold_tags('<b class="bionic">read</b>ing') == "reading"
+

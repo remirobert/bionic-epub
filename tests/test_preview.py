@@ -136,4 +136,4 @@ class TestPreview:
                 assert names
                 output = archive.read(names[0]).decode("utf-8")
             # Force must re-transform body text, not only re-stamp the marker.
-            assert '<b class="bionic">Hel</b>lo' in output
+            assert '<b>Hel</b>lo' in output
