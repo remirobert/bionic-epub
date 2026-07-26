@@ -96,12 +96,16 @@ class TestFrench:
         assert "hom me" in result
 
     def test_elision_does_not_bold_single_letter_clitic(self):
-        """French elisions: l'homme → l'<b>hom</b>me (never bold the single-letter l)."""
+        """French elisions: never bold the single-letter clitic before the apostrophe."""
         for fixation in (1, 2, 3):
             result = transform_text("l'homme", BionicSettings(fixation=fixation))
             assert not result.startswith('<b>l</b>')
             assert result.startswith("l'")
-            assert '<b>hom</b>me' in result
+        # Table levels (heavier on short stems):
+        assert '<b>hom</b>me' in transform_text("l'homme", BionicSettings(fixation=1))
+        assert '<b>hom</b>me' in transform_text("l'homme", BionicSettings(fixation=2))
+        # Website default (f=3): round(0.4 * 5) → 2
+        assert '<b>ho</b>mme' in transform_text("l'homme", BionicSettings(fixation=3))
 
     def test_ligature_oe(self):
         assert transform_text_spaced("cœur") == "cœu r"
@@ -142,8 +146,9 @@ class TestSettings:
             raise AssertionError("expected ValueError")
 
     def test_min_bold_word_length_can_allow_single_chars(self):
-        # Explicit min of 1 restores table-driven single-letter bolding at fixation 3.
-        settings = BionicSettings(fixation=3, min_bold_word_length=1)
+        # Explicit min of 1 restores table-driven single-letter bolding (f=2 table).
+        # Fixation 3 uses the website formula, which returns 0 for length-1 words.
+        settings = BionicSettings(fixation=2, min_bold_word_length=1)
         assert transform_text("a", settings) == '<b>a</b>'
 
     def test_custom_marker(self):

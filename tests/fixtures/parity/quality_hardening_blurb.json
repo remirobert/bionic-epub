@@ -1,0 +1,8 @@
+{
+  "id": "quality_hardening_blurb",
+  "source": "official Bionic Reading web demo (default fixation / saccade)",
+  "notes": "Expected bold lengths = round(0.4 * len) with min_bold_word_length 2 (single letters unbolded). Matches website base settings observed on English samples.",
+  "text": "Combines the quality hardening work into one PR against main. Improves how converted books read on real devices, especially French Word/Calibre EPUBs.\n\nNormalize pipeline: strip soft hyphens and zero-width junk; keep language-only span unwrap + smooth so mid-word bold stays continuous",
+  "bold_lengths": null,
+  "derive": "round_0_4"
+}
