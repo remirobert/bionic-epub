@@ -50,7 +50,8 @@ Old table f=3 systematically over-bolded by **+1** character for lengths ≥ 5 (
 
 ## Implementation
 
-- `src/bionic_reading/fixation.py` — special-case `fixation == 3`  
-- `tests/fixtures/parity/*.json` — demo samples  
-- `tests/test_website_parity.py` — formula + fixture scorer  
+- `src/bionic_reading/fixation.py` — special-case `fixation == 3`; no boundary table for level 3  
+- `tests/fixtures/parity/*.json` — independent transcribed demo samples (`bold_lengths` only; no self-derive)  
+- `tests/test_website_parity.py` — formula unit checks + fixture scorer via production `transform_word`  
 - README note on default meaning  
+

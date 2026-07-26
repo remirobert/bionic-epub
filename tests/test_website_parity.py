@@ -1,55 +1,62 @@
 """Parity checks against official Bionic Reading web demo (default settings).
 
 Default fixation (3) uses ``round(0.4 * n)``. Fixtures under
-``tests/fixtures/parity/`` hold source text and expected bold lengths.
+``tests/fixtures/parity/`` hold source text and expected bold lengths
+transcribed from the public demo (not derived from this codebase).
 """
 
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-
-import regex
 
 from bionic_reading.fixation import WEBSITE_DEFAULT_FIXATION_RATIO, fixation_length
 from bionic_reading.settings import BionicSettings
-from bionic_reading.transform import transform_text, transform_word
+from bionic_reading.transform import CONVERTIBLE_WORD, transform_text, transform_word
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "parity"
-CONVERTIBLE_WORD = regex.compile(r"(\p{L}|\p{Nd})*\p{L}(\p{L}|\p{Nd})*")
 
 # Single-letter initials (J, K, A) are bolded on the website but skipped by
 # min_bold_word_length=2. Require high overall match, not 100%.
 MIN_EXACT_MATCH_RATIO = 0.95
+
+# Plain <b>…</b> prefix produced by bold_style="b".
+_PLAIN_BOLD_PREFIX = re.compile(r"^<b>(.*?)</b>", re.DOTALL)
 
 
 def _tokens(text: str) -> list[str]:
     return [m.group(0) for m in CONVERTIBLE_WORD.finditer(text)]
 
 
+def _settings_for_scoring() -> BionicSettings:
+    """Default fixation/saccade/min-bold, plain marker for easy bold-length parse."""
+    return BionicSettings(bold_style="b")
+
+
+def _bold_len_from_transform_word(word: str, settings: BionicSettings) -> int:
+    """Bold length via production ``transform_word`` (not a parallel formula path)."""
+    out = transform_word(word, settings)
+    if out == word:
+        return 0
+    match = _PLAIN_BOLD_PREFIX.match(out)
+    if not match:
+        return 0
+    return len(match.group(1))
+
+
 def _predicted_bold_lengths(text: str, settings: BionicSettings | None = None) -> list[int]:
-    config = settings or BionicSettings()
-    lengths: list[int] = []
-    for word in _tokens(text):
-        bold_len = fixation_length(word, config.fixation)
-        if len(word) < config.min_bold_word_length:
-            bold_len = 0
-        lengths.append(bold_len)
-    return lengths
+    config = settings or _settings_for_scoring()
+    return [_bold_len_from_transform_word(word, config) for word in _tokens(text)]
 
 
 def _expected_from_fixture(data: dict) -> list[int]:
-    if data.get("derive") == "round_0_4":
-        settings = BionicSettings()
-        return [
-            0
-            if len(w) < settings.min_bold_word_length
-            else fixation_length(w, 3)
-            for w in _tokens(data["text"])
-        ]
     lengths = data.get("bold_lengths")
     if not isinstance(lengths, list):
-        raise AssertionError(f"fixture {data.get('id')!r} missing bold_lengths")
+        raise AssertionError(
+            f"fixture {data.get('id')!r} must include transcribed bold_lengths "
+            "(derive/self-check fixtures are not allowed)"
+        )
     return lengths
 
 
@@ -98,6 +105,11 @@ class TestWebsiteDefaultFixationFormula:
         assert fixation_length("reading", 5) == 2
         assert fixation_length("reading", 1) > fixation_length("reading", 3)
 
+    def test_level_3_not_in_boundary_tables(self):
+        from bionic_reading.fixation import FIXATION_BOUNDARIES
+
+        assert 3 not in FIXATION_BOUNDARIES
+
     def test_empty_word(self):
         assert fixation_length("", 3) == 0
 
@@ -105,10 +117,14 @@ class TestWebsiteDefaultFixationFormula:
 class TestParityFixtures:
     def test_fixtures_exist(self):
         paths = list(FIXTURES.glob("*.json"))
-        assert paths, "expected parity fixtures under tests/fixtures/parity/"
+        assert len(paths) >= 2, "expected at least two independent parity fixtures"
+        for path in paths:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            assert isinstance(data.get("bold_lengths"), list), path.name
+            assert "derive" not in data, f"{path.name} must not use self-derived expectations"
 
     def test_each_fixture_meets_match_threshold(self):
-        settings = BionicSettings()  # fixation 3, saccade 10, min_bold 2
+        settings = _settings_for_scoring()
         for data in _load_fixtures():
             text = data["text"]
             expected = _expected_from_fixture(data)
@@ -129,11 +145,10 @@ class TestParityFixtures:
                 f"< {MIN_EXACT_MATCH_RATIO:.0%}; diffs={diffs[:12]}"
             )
 
-    def test_harry_potter_fixture_alignment(self):
+    def test_harry_potter_residual_diffs_are_single_letter(self):
         data = json.loads((FIXTURES / "harry_potter.json").read_text(encoding="utf-8"))
         tokens = _tokens(data["text"])
         assert len(tokens) == len(data["bold_lengths"])
-        # Only known residual gaps vs website transcription: single-letter initials.
         predicted = _predicted_bold_lengths(data["text"])
         diffs = [
             (tok, e, p)
