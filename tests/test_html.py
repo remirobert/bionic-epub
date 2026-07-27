@@ -85,9 +85,10 @@ class TestHtmlTransform:
     def test_french_elision_does_not_bold_clitic(self):
         html = "<html><body><p>l'homme et d'autres.</p></body></html>"
         result = transform_html_document(html, BionicSettings(fixation=3))
-        assert 'l\'<b>hom</b>me' in result
+        # Website default f=3: round(0.4 * len) — homme→2, autres→2
+        assert 'l\'<b>ho</b>mme' in result
         assert '<b>l</b>' not in result
-        assert 'd\'<b>aut</b>res' in result
+        assert 'd\'<b>au</b>tres' in result
         assert '<b>d</b>' not in result
 
     def test_skips_code_blocks(self):

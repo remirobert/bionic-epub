@@ -33,7 +33,7 @@ bionic-epub my-book.epub --preview
 | Flag | What it does |
 |------|--------------|
 | `-o path.epub` | Custom output path |
-| `-f 1–5` | Bold strength (default `3`) |
+| `-f 1–5` | Bold strength (default `3` ≈ official web demo; lighter/heavier tables for other values) |
 | `-s 10–50` | How often words are bolded (default `10` = every word) |
 | `--preview` | Try it on the first 200 words, no file written |
 | `--force` | Re-convert even if the file already has a bionic-epub marker |
@@ -46,6 +46,7 @@ bionic-epub my-book.epub --preview
 - Mid-word italic, links, or styled spans (`<i>`, `<a>`, `class`/`style` spans) are **not** unwrapped; bold may still break inside those words.
 - Headings, code blocks, and existing bold text are left alone.
 - Hyphen-minus compounds (`well-known`) stay separate tokens around `-` (intentional).
+- Default fixation (`-f 3`) uses `round(0.4 × word_length)` to track the official Bionic Reading **web demo**. Levels 1–2 / 4–5 still use reverse-engineered API tables (heavier / lighter).
 
 ## Development
 
